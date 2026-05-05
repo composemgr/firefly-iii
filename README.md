@@ -56,8 +56,8 @@ See `docker-compose.yaml` for complete list of configurable options.
 
 ## 📂 Volumes
 
-- `./rootfs/data/firefly-iii` - Data storage
-- `./rootfs/data/db/mariadb/firefly-iii` - Data storage
+- `./volumes/data/firefly-iii` - Data storage
+- `./volumes/data/db/mariadb/firefly-iii` - Data storage
 
 ## 🔐 Security
 
