@@ -1,5 +1,6 @@
 # nginx proxy address - http://172.17.0.1:8080
 
+name: firefly-iii
 x-logging: &default-logging
   driver: json-file
   options:
@@ -9,16 +10,17 @@ x-logging: &default-logging
 services:
   firefly-iii:
     image: fireflyiii/core:latest
+    pull_policy: always
     container_name: firefly-iii-app
-    restart: unless-stopped
+    restart: always
     logging: *default-logging
     networks:
       - firefly-iii
     ports:
-      - "8080:8080"
+      - "172.17.0.1:8080:8080"
     environment:
       TZ: ${TZ:-America/New_York}
-      APP_KEY: ${APP_SECRET_KEY:-changeme_secret_key_32_characters_long}
+      APP_KEY: ${APP_SECRET_KEY:-changeme_secret_key_32characters}
       DB_HOST: firefly-iii-db
       DB_PORT: "3306"
       DB_CONNECTION: mysql
@@ -28,10 +30,12 @@ services:
       MAIL_MAILER: smtp
       MAIL_HOST: ${EMAIL_SERVER_HOST:-172.17.0.1}
       MAIL_PORT: ${EMAIL_SERVER_PORT:-587}
-      MAIL_FROM: firefly-iii@${BASE_DOMAIN_NAME:-${BASE_HOST_NAME:-localhost}}
-      MAIL_USERNAME: ${EMAIL_SERVER_LOGIN_NAME:-}
-      MAIL_PASSWORD: ${EMAIL_SERVER_LOGIN_PASS:-}
+      MAIL_FROM: ${APP_ADMIN_EMAIL:-firefly@example.com}
+      MAIL_USERNAME: ${EMAIL_SERVER_USER:-}
+      MAIL_PASSWORD: ${EMAIL_SERVER_PASS:-}
       MAIL_ENCRYPTION: tls
+      APP_URL: http://${BASE_HOST_NAME:-localhost}:8080
+      TRUSTED_PROXIES: "**"
     volumes:
       - ./volumes/data/firefly-iii:/var/www/html/storage/upload
     depends_on:
@@ -43,9 +47,10 @@ services:
       retries: 3
 
   firefly-iii-db:
-    image: mariadb:11
+    image: mariadb:latest
+    pull_policy: always
     container_name: firefly-iii-db
-    restart: unless-stopped
+    restart: always
     logging: *default-logging
     networks:
       - firefly-iii
@@ -54,7 +59,7 @@ services:
       MARIADB_DATABASE: ${DB_CREATE_DATABASE_NAME:-firefly}
       MARIADB_USER: ${DB_USER_NAME:-firefly}
       MARIADB_PASSWORD: ${DB_USER_PASS:-changeme_db_password}
-      MARIADB_ROOT_PASSWORD: ${DB_ADMIN_PASS:-changeme_root_password}
+      MARIADB_ROOT_PASSWORD: ${DB_ADMIN_PASS:-changeme_admin_password}
     volumes:
       - ./volumes/data/db/mariadb/firefly-iii:/var/lib/mysql
     healthcheck:
@@ -65,4 +70,5 @@ services:
 
 networks:
   firefly-iii:
+    name: firefly-iii
     external: false
