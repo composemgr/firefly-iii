@@ -1,0 +1,95 @@
+name: firefly-iii
+x-logging: &default-logging
+  options:
+    max-size: '5m'
+    max-file: '1'
+  driver: json-file
+
+services:
+  app:
+    image: fireflyiii/core:latest
+    container_name: firefly-iii-app
+    domainname: ${BASE_DOMAIN_NAME:-example.com}
+    hostname: ${BASE_HOST_NAME:-$HOSTNAME}
+    restart: always
+    pull_policy: always
+    logging: *default-logging
+    environment:
+      TZ: ${TZ:-America/New_York}
+      CONTAINER_NAME: firefly-iii-app
+      HOSTNAME: ${BASE_HOST_NAME:-$HOSTNAME}
+      APP_ENV: local
+      APP_KEY: ${APP_SECRET_KEY:-replace-with-a-random-32-character-secret}
+      APP_URL: http://${BASE_HOST_NAME:-$HOSTNAME}:64171
+      SITE_OWNER: ${EMAIL_SERVER_MAIL_FROM:-admin@example.com}
+      TRUSTED_PROXIES: '**'
+      DB_HOST: firefly-iii-db
+      DB_PORT: '3306'
+      DB_CONNECTION: mysql
+      DB_DATABASE: ${DB_CREATE_DATABASE_NAME:-firefly}
+      DB_USERNAME: ${DB_USER_NAME:-firefly}
+      DB_PASSWORD: ${DB_USER_PASS:-replace-with-a-random-password}
+      MAIL_MAILER: smtp
+      MAIL_HOST: ${EMAIL_SERVER_HOST:-172.17.0.1}
+      MAIL_PORT: ${EMAIL_SERVER_PORT:-587}
+      MAIL_FROM: ${EMAIL_SERVER_MAIL_FROM:-firefly@example.com}
+      MAIL_USERNAME: ${EMAIL_SERVER_LOGIN_NAME:-}
+      MAIL_PASSWORD: ${EMAIL_SERVER_LOGIN_PASS:-}
+      MAIL_ENCRYPTION: tls
+    volumes:
+      - './volumes/data/firefly-iii:/var/www/html/storage/upload:z'
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '--spider', 'http://localhost:8080/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.docker.network=traefik'
+      - 'traefik.http.routers.firefly-iii-app.entrypoints=http'
+      - 'traefik.http.routers.firefly-iii-app.rule=Host(`${BASE_HOST_NAME:-$HOSTNAME}`)'
+      - 'traefik.http.routers.firefly-iii-app.middlewares=firefly-iii-app-https-redirect'
+      - 'traefik.http.middlewares.firefly-iii-app-https-redirect.redirectscheme.scheme=https'
+      - 'traefik.http.routers.firefly-iii-app-secure.entrypoints=https'
+      - 'traefik.http.routers.firefly-iii-app-secure.rule=Host(`${BASE_HOST_NAME:-$HOSTNAME}`)'
+      - 'traefik.http.routers.firefly-iii-app-secure.tls.certresolver=cloudflare'
+      - 'traefik.http.routers.firefly-iii-app-secure.service=firefly-iii-app'
+      - 'traefik.http.services.firefly-iii-app.loadbalancer.server.port=8080'
+    networks:
+      - firefly-iii
+      - traefik
+
+  db:
+    image: mariadb:latest
+    container_name: firefly-iii-db
+    domainname: ${BASE_DOMAIN_NAME:-example.com}
+    hostname: firefly-iii-db
+    restart: always
+    pull_policy: always
+    logging: *default-logging
+    environment:
+      TZ: ${TZ:-America/New_York}
+      CONTAINER_NAME: firefly-iii-db
+      MARIADB_DATABASE: ${DB_CREATE_DATABASE_NAME:-firefly}
+      MARIADB_USER: ${DB_USER_NAME:-firefly}
+      MARIADB_PASSWORD: ${DB_USER_PASS:-replace-with-a-random-password}
+      MARIADB_ROOT_PASSWORD: ${DB_ADMIN_PASS:-replace-with-a-random-password}
+    volumes:
+      - './volumes/db/mariadb/firefly-iii:/var/lib/mysql:z'
+    healthcheck:
+      test: ['CMD', 'healthcheck.sh', '--connect', '--innodb_initialized']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - firefly-iii
+
+networks:
+  firefly-iii:
+    name: firefly-iii
+    external: false
+  traefik:
+    external: true
